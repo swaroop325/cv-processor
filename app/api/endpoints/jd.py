@@ -113,7 +113,7 @@ async def find_best_cvs(
     if not jd:
         raise HTTPException(status_code=404, detail=f"Job description with title '{request.job_title}' not found")
 
-    if not jd.embedding_generated or not jd.embedding:
+    if not jd.embedding_generated or jd.embedding is None or len(jd.embedding) == 0:
         raise HTTPException(status_code=400, detail="JD embedding not available")
 
     # Find matching CVs using vector similarity
