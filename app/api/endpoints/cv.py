@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
@@ -15,17 +15,62 @@ router = APIRouter()
 
 @router.post("/upload", response_model=CVResponse, dependencies=[Depends(verify_secret_key)])
 async def upload_cv(
-    file: UploadFile = File(...),
+    request: Request,
+    content_type: str = Header(..., alias="Content-Type"),
+    content_disposition: str = Header(None, alias="Content-Disposition"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     API 1: Upload CV and add to collection
-    Only accepts CV file (PDF or DOCX)
+    Accepts binary file content (PDF or DOCX)
     Automatically extracts: name, email, phone, skills, summary
-    Requires: X-Secret-Key header
+    Requires: X-Secret-Key header, Content-Type header
+    Content-Type should be: application/pdf or application/vnd.openxmlformats-officedocument.wordprocessingml.document
     """
+    # Read raw binary content
+    file_content = await request.body()
+
+    if not file_content:
+        raise HTTPException(status_code=400, detail="No file content provided")
+
+    # Determine file type from Content-Type header
+    if content_type == "application/pdf":
+        file_type = "pdf"
+        filename = "uploaded_cv.pdf"
+    elif content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        file_type = "docx"
+        filename = "uploaded_cv.docx"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported Content-Type. Use 'application/pdf' or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'"
+        )
+
+    # Extract filename from Content-Disposition if provided
+    if content_disposition:
+        import re
+        filename_match = re.search(r'filename="?([^"]+)"?', content_disposition)
+        if filename_match:
+            filename = filename_match.group(1)
+
+    # Create a file-like object for the processor
+    from io import BytesIO
+    file_obj = BytesIO(file_content)
+
+    # Create a mock UploadFile object
+    class MockUploadFile:
+        def __init__(self, content, filename, content_type):
+            self.file = BytesIO(content)
+            self.filename = filename
+            self.content_type = content_type
+
+        async def read(self):
+            return self.file.getvalue()
+
+    mock_file = MockUploadFile(file_content, filename, content_type)
+
     # Extract and parse CV
-    cv_data = await CVProcessor.extract_and_parse(file)
+    cv_data = await CVProcessor.extract_and_parse(mock_file)
 
     # Validate required fields
     if not cv_data.get("email"):
