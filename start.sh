@@ -13,10 +13,9 @@ fi
 echo "🛑 Stopping existing containers..."
 docker-compose down
 
-# Start services with rebuild (no cache)
-echo "📦 Building and starting Docker containers (no cache)..."
-docker-compose build --no-cache
-docker-compose up -d
+# Start services with rebuild
+echo "📦 Building and starting Docker containers..."
+docker-compose up -d --build --no-cache
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
