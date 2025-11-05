@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
 import logging
+from io import BytesIO
 
 from app.db.session import get_db
 from app.models.cv import CV
@@ -18,27 +19,53 @@ logger = logging.getLogger(__name__)
 @router.post(
     "/upload",
     response_model=CVResponse,
-    dependencies=[Depends(verify_secret_key)]
+    dependencies=[Depends(verify_secret_key)],
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/pdf": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                },
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                },
+                "application/octet-stream": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        }
+    }
 )
 async def upload_cv(
-    file: UploadFile = File(..., description="CV file (PDF or DOCX)"),
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
     API 1: Upload CV and add to collection
 
-    Upload a CV file (PDF or DOCX) using multipart/form-data.
+    Upload raw binary CV file (PDF or DOCX).
     Automatically extracts: name, email, phone, skills, summary
 
-    **Supported file types:**
-    - PDF (.pdf)
-    - DOCX (.docx, .doc)
+    **Request Format:**
+    - Send raw binary file content in request body
+    - Set Content-Type header to: application/pdf or application/vnd.openxmlformats-officedocument.wordprocessingml.document
 
     **Example using curl:**
     ```bash
     curl -X POST "http://localhost:8000/api/cv/upload" \\
       -H "X-Secret-Key: your-secret-key" \\
-      -F "file=@/path/to/cv.pdf"
+      -H "Content-Type: application/pdf" \\
+      --data-binary "@/path/to/cv.pdf"
     ```
 
     **Example using Python requests:**
@@ -47,19 +74,52 @@ async def upload_cv(
     with open('cv.pdf', 'rb') as f:
         response = requests.post(
             'http://localhost:8000/api/cv/upload',
-            headers={'X-Secret-Key': 'your-secret-key'},
-            files={'file': f}
+            headers={
+                'X-Secret-Key': 'your-secret-key',
+                'Content-Type': 'application/pdf'
+            },
+            data=f.read()
         )
     ```
     """
     logger.info("=== CV Upload Request Started ===")
-    logger.info(f"Filename: {file.filename}")
-    logger.info(f"Content-Type: {file.content_type}")
+
+    # Get content type from headers
+    content_type = request.headers.get("content-type", "")
+    logger.info(f"Content-Type: {content_type}")
+
+    # Read binary content
+    file_content = await request.body()
+    file_size = len(file_content)
+    logger.info(f"File size: {file_size} bytes")
+
+    if not file_content:
+        raise HTTPException(status_code=400, detail="No file content provided")
+
+    # Determine filename from content type
+    if "pdf" in content_type.lower():
+        filename = "uploaded_cv.pdf"
+    elif "word" in content_type.lower() or "document" in content_type.lower():
+        filename = "uploaded_cv.docx"
+    else:
+        filename = "uploaded_cv"
+
+    # Create mock UploadFile object for CVProcessor
+    class MockUploadFile:
+        def __init__(self, content: bytes, filename: str, content_type: str):
+            self.file = BytesIO(content)
+            self.filename = filename
+            self.content_type = content_type
+
+        async def read(self):
+            return self.file.getvalue()
+
+    mock_file = MockUploadFile(file_content, filename, content_type)
 
     # Extract and parse CV
     logger.info("Starting CV extraction and parsing")
     try:
-        cv_data = await CVProcessor.extract_and_parse(file)
+        cv_data = await CVProcessor.extract_and_parse(mock_file)
         logger.info(f"CV extraction successful. Extracted data keys: {list(cv_data.keys())}")
     except Exception as e:
         logger.error(f"CV extraction failed: {str(e)}", exc_info=True)
@@ -68,15 +128,12 @@ async def upload_cv(
     # Validate required fields
     logger.info("Validating required fields")
     if not cv_data.get("email"):
-        preview = cv_data.get("raw_text", "")[:500] if cv_data.get("raw_text") else "No text extracted"
-        logger.error(f"Email not found in CV. Text preview: {preview[:100]}...")
         raise HTTPException(
             status_code=400,
-            detail=f"Could not extract email from CV. Please ensure CV contains email address."
+            detail="Could not extract email from CV. Please ensure CV contains email address."
         )
 
     if not cv_data.get("candidate_name"):
-        logger.error("Candidate name not found in CV")
         raise HTTPException(status_code=400, detail="Could not extract name from CV. Please ensure CV contains candidate name.")
 
     logger.info(f"Extracted candidate: {cv_data['candidate_name']}, email: {cv_data['email']}")
@@ -97,7 +154,7 @@ async def upload_cv(
         raw_text=cv_data["raw_text"],
         summary=cv_data.get("summary"),
         skills=cv_data.get("skills"),
-        file_name=file.filename,
+        file_name=filename,
         file_type=cv_data["file_type"]
     )
 

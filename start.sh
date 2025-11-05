@@ -3,16 +3,22 @@
 echo "🚀 Starting CV Processing Backend..."
 echo ""
 
-# Check if docker-compose is installed
-if ! command -v docker-compose &> /dev/null; then
+# Check which docker compose command to use
+if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+    echo "Using Docker Compose V2"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+    echo "Using Docker Compose V1"
+else
     echo "❌ docker-compose not found. Please install docker-compose first."
     exit 1
 fi
 
 # Default: build without cache and force recreate for clean builds
 echo "📦 Building and starting containers (no cache, force recreate)..."
-docker-compose build --no-cache
-docker-compose up -d --force-recreate
+$DOCKER_COMPOSE build --no-cache
+$DOCKER_COMPOSE up -d --force-recreate
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
@@ -20,19 +26,19 @@ sleep 5
 
 # Check if containers are running
 echo "🔍 Checking container status..."
-RUNNING_CONTAINERS=$(docker-compose ps --services --filter "status=running" 2>/dev/null | wc -l)
+RUNNING_CONTAINERS=$($DOCKER_COMPOSE ps --services --filter "status=running" 2>/dev/null | wc -l)
 
 if [ "$RUNNING_CONTAINERS" -lt 2 ]; then
     echo "❌ Containers failed to start!"
     echo ""
     echo "📋 Container status:"
-    docker-compose ps
+    $DOCKER_COMPOSE ps
     echo ""
     echo "📋 Backend logs:"
-    docker-compose logs --tail=50 backend
+    $DOCKER_COMPOSE logs --tail=50 backend
     echo ""
     echo "📋 Database logs:"
-    docker-compose logs --tail=20 db
+    $DOCKER_COMPOSE logs --tail=20 db
     exit 1
 fi
 
@@ -62,7 +68,7 @@ if [ -f .env ]; then
     echo "❌ Backend health check failed after 5 attempts"
     echo ""
     echo "📋 Backend logs:"
-    docker-compose logs --tail=50 backend
+    $DOCKER_COMPOSE logs --tail=50 backend
     exit 1
 else
     echo "⚠️  .env file not found. Skipping health check."
