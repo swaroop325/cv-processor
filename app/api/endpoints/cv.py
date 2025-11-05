@@ -33,17 +33,37 @@ async def upload_cv(
     if not file_content:
         raise HTTPException(status_code=400, detail="No file content provided")
 
+    # Normalize Content-Type (remove charset and other parameters)
+    content_type_normalized = content_type.split(';')[0].strip().lower()
+
     # Determine file type from Content-Type header
-    if content_type == "application/pdf":
+    if content_type_normalized == "application/pdf":
         file_type = "pdf"
         filename = "uploaded_cv.pdf"
-    elif content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    elif content_type_normalized in [
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "application/docx"
+    ]:
         file_type = "docx"
         filename = "uploaded_cv.docx"
+    elif content_type_normalized in ["application/octet-stream", "binary/octet-stream"]:
+        # If generic binary type, try to detect from file signature
+        if file_content[:4] == b'%PDF':
+            file_type = "pdf"
+            filename = "uploaded_cv.pdf"
+        elif file_content[:2] == b'PK':  # ZIP archive (DOCX is a ZIP file)
+            file_type = "docx"
+            filename = "uploaded_cv.docx"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot determine file type. Please set Content-Type to 'application/pdf' or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'"
+            )
     else:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported Content-Type. Use 'application/pdf' or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'"
+            detail=f"Unsupported Content-Type: '{content_type}'. Use 'application/pdf' or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' or 'application/octet-stream'"
         )
 
     # Extract filename from Content-Disposition if provided
