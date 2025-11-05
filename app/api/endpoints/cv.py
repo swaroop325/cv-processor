@@ -142,13 +142,27 @@ async def upload_cv(
 async def list_cvs(
     skip: int = 0,
     limit: int = 100,
+    search: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get list of all CVs
+    Get list of all CVs with optional search
     Requires: X-Secret-Key header
+    Query params:
+    - skip: Number of records to skip (default: 0)
+    - limit: Maximum number of records to return (default: 100)
+    - search: Search by candidate name or email (optional)
     """
-    result = await db.execute(
-        select(CV).offset(skip).limit(limit).order_by(CV.created_at.desc())
-    )
+    query = select(CV)
+
+    # Add search filter if provided
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (CV.candidate_name.ilike(search_term)) |
+            (CV.email.ilike(search_term))
+        )
+
+    query = query.offset(skip).limit(limit).order_by(CV.created_at.desc())
+    result = await db.execute(query)
     return result.scalars().all()

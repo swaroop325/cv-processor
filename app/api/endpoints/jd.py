@@ -64,15 +64,32 @@ async def list_jds(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = True,
+    search: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get list of all job descriptions
+    Get list of all job descriptions with optional search
     Requires: X-Secret-Key header
+    Query params:
+    - skip: Number of records to skip (default: 0)
+    - limit: Maximum number of records to return (default: 100)
+    - active_only: Only return active job descriptions (default: true)
+    - search: Search by job title or requirements (optional)
     """
     query = select(JD)
+
+    # Filter by active status
     if active_only:
         query = query.where(JD.is_active == True)
+
+    # Add search filter if provided
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (JD.title.ilike(search_term)) |
+            (JD.requirements.ilike(search_term))
+        )
+
     query = query.offset(skip).limit(limit).order_by(JD.created_at.desc())
 
     result = await db.execute(query)
