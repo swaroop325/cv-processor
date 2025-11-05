@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/cv_processor"
 
     # SMTP
-    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_HOST: str = "smtp-mail.outlook.com"
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_TLS: bool = True
-    EMAILS_FROM_EMAIL: str = "noreply@cvprocessor.com"
+    EMAILS_FROM_EMAIL: str = "noreply@ta-portal.com"
     EMAILS_FROM_NAME: str = "CV Processor"
 
     class Config:

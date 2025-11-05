@@ -58,14 +58,24 @@ Response:
 
 ### 3. Find Best CVs (JSON)
 
-Replace `{jd_id}` with UUID from step 2:
+Use the job title from step 2:
 
 ```bash
 curl -X POST "http://localhost:8000/api/jd/find-best-cvs" \
   -H "Content-Type: application/json" \
   -d '{
-    "jd_id": "234e5678-e89b-12d3-a456-426614174001",
-    "top_k": 5
+    "job_title": "Senior Python Developer"
+  }'
+```
+
+Note: `top_k` is optional and defaults to 5. You can override it:
+
+```bash
+curl -X POST "http://localhost:8000/api/jd/find-best-cvs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_title": "Senior Python Developer",
+    "top_k": 10
   }'
 ```
 
@@ -86,12 +96,14 @@ Response:
 
 ### 4. Contact Candidate (JSON)
 
+Use candidate name and job title:
+
 ```bash
 curl -X POST "http://localhost:8000/api/jd/contact-candidate" \
   -H "Content-Type: application/json" \
   -d '{
-    "cv_id": "123e4567-e89b-12d3-a456-426614174000",
-    "jd_id": "234e5678-e89b-12d3-a456-426614174001"
+    "candidate_name": "Jane Smith",
+    "job_title": "Senior Python Developer"
   }'
 ```
 
@@ -111,8 +123,8 @@ Response:
 |-----|--------------|-------|
 | 1. Upload CV | multipart/form-data | file only |
 | 2. Create JD | application/json | title, requirements |
-| 3. Find CVs | application/json | jd_id, top_k |
-| 4. Contact | application/json | cv_id, jd_id |
+| 3. Find CVs | application/json | job_title, top_k (optional, default: 5) |
+| 4. Contact | application/json | candidate_name, job_title |
 
 ## View API Docs
 
@@ -127,12 +139,15 @@ curl http://localhost:8000/api/cv/list
 # List JDs
 curl http://localhost:8000/api/jd/list
 
+# Clear all records from CV and JD tables
+./clear_database.sh
+
 # View logs
 docker-compose logs -f backend
 
 # Stop
 docker-compose down
 
-# Reset database
+# Reset database (removes all data and volumes)
 docker-compose down -v && docker-compose up -d
 ```

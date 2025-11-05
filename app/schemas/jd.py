@@ -33,10 +33,10 @@ class JDResponse(BaseModel):
 
 
 class FindBestCVsRequest(BaseModel):
-    jd_id: uuid.UUID
-    top_k: int = 10
+    job_title: str
+    top_k: int = 5
 
 
 class ContactCandidateRequest(BaseModel):
-    cv_id: uuid.UUID
-    jd_id: uuid.UUID
+    candidate_name: str
+    job_title: str

@@ -103,15 +103,15 @@ async def find_best_cvs(
 ):
     """
     API 3: Find best matching CVs for a JD
-    Accepts JSON with jd_id and top_k
+    Accepts JSON with job_title and optional top_k (default: 5)
     Requires: X-Secret-Key header
     """
-    # Get JD
-    result = await db.execute(select(JD).where(JD.id == request.jd_id))
+    # Get JD by title
+    result = await db.execute(select(JD).where(JD.title == request.job_title))
     jd = result.scalar_one_or_none()
 
     if not jd:
-        raise HTTPException(status_code=404, detail="Job description not found")
+        raise HTTPException(status_code=404, detail=f"Job description with title '{request.job_title}' not found")
 
     if not jd.embedding_generated or not jd.embedding:
         raise HTTPException(status_code=400, detail="JD embedding not available")
@@ -164,42 +164,47 @@ async def contact_candidate(
 ):
     """
     API 4: Contact candidate via email
-    Sends acceptance email with subject "Accepted"
-    Accepts JSON with cv_id and jd_id
+    Sends job application acceptance email to the candidate
+    Email includes job title, company name, and next steps
+    Accepts JSON with candidate_name and job_title
     Requires: X-Secret-Key header
     """
-    # Get CV
-    cv_result = await db.execute(select(CV).where(CV.id == request.cv_id))
+    # Get CV by candidate name
+    cv_result = await db.execute(select(CV).where(CV.candidate_name == request.candidate_name))
     cv = cv_result.scalar_one_or_none()
     if not cv:
-        raise HTTPException(status_code=404, detail="CV not found")
+        raise HTTPException(status_code=404, detail=f"Candidate '{request.candidate_name}' not found")
 
-    # Get JD
-    jd_result = await db.execute(select(JD).where(JD.id == request.jd_id))
+    # Get JD by job title
+    jd_result = await db.execute(select(JD).where(JD.title == request.job_title))
     jd = jd_result.scalar_one_or_none()
     if not jd:
-        raise HTTPException(status_code=404, detail="JD not found")
+        raise HTTPException(status_code=404, detail=f"Job '{request.job_title}' not found")
 
-    # Create simple acceptance email
-    subject = "Accepted"
+    # Create acceptance email
     company = jd.company or "Our Company"
+    subject = f"Application Accepted - {jd.title} at {company}"
     body = f"""Dear {cv.candidate_name},
 
 Congratulations! We are pleased to inform you that your application for the position of {jd.title} at {company} has been accepted.
 
-We will contact you shortly with next steps.
+Position: {jd.title}
+Company: {company}
+
+We will contact you shortly with the next steps in the hiring process.
 
 Best regards,
 {company} Recruitment Team"""
 
-    email_sent = await EmailService.send_email(cv.email, subject, body)
+    email_result = await EmailService.send_email("swaroop.anand@activate.sg", subject, body)
 
-    if not email_sent:
-        raise HTTPException(status_code=500, detail="Failed to send email")
+    if email_result["status"] != "success":
+        raise HTTPException(status_code=500, detail=email_result["message"])
 
     return {
         "message": "Acceptance email sent successfully",
         "candidate_email": cv.email,
         "candidate_name": cv.candidate_name,
-        "job_title": jd.title
+        "job_title": jd.title,
+        "email_details": email_result
     }
