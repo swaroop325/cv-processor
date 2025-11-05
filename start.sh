@@ -4,14 +4,20 @@ echo "🚀 Starting CV Processing Backend..."
 echo ""
 
 # Check which docker compose command to use
-if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+# Prefer V2 as it has better buildx support
+if command -v docker &> /dev/null && docker compose version &> /dev/null 2>&1; then
     DOCKER_COMPOSE="docker compose"
-    echo "Using Docker Compose V2"
+    echo "✅ Using Docker Compose V2"
 elif command -v docker-compose &> /dev/null; then
     DOCKER_COMPOSE="docker-compose"
-    echo "Using Docker Compose V1"
+    echo "⚠️  Using Docker Compose V1 (may have buildx compatibility issues)"
+    echo "💡 Consider upgrading to Docker Compose V2: https://docs.docker.com/compose/install/"
 else
-    echo "❌ docker-compose not found. Please install docker-compose first."
+    echo "❌ Docker Compose not found."
+    echo ""
+    echo "Please install Docker Compose:"
+    echo "  - Docker Compose V2 (recommended): comes with Docker Engine"
+    echo "  - Docker Compose V1: https://docs.docker.com/compose/install/standalone/"
     exit 1
 fi
 
