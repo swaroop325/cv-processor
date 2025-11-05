@@ -9,16 +9,10 @@ if ! command -v docker-compose &> /dev/null; then
     exit 1
 fi
 
-# Check if --no-cache flag is provided
-if [ "$1" = "--no-cache" ]; then
-    echo "📦 Building and starting containers (no cache, force recreate)..."
-    docker-compose build --no-cache
-    docker-compose up -d --force-recreate
-else
-    # Default: build with cache and recreate
-    echo "📦 Building and starting containers (with cache, force recreate)..."
-    docker-compose up -d --build --force-recreate
-fi
+# Default: build without cache and force recreate for clean builds
+echo "📦 Building and starting containers (no cache, force recreate)..."
+docker-compose build --no-cache
+docker-compose up -d --force-recreate
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
