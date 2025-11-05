@@ -17,7 +17,7 @@ services:
       retries: 5
 
   backend:
-    build: .
+    image: cv-processor-backend
     container_name: cv_processor_backend
     ports:
       - "8000:8000"

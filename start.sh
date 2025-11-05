@@ -13,17 +13,23 @@ fi
 echo "🛑 Stopping existing containers..."
 docker-compose down
 
+# Remove old image to force rebuild
+echo "🗑️  Removing old images..."
+docker rmi cv-processor-backend 2>/dev/null || true
+
 # Check if --cache flag is provided (default is no-cache)
 if [ "$1" = "--cache" ]; then
-    echo "📦 Building and starting Docker containers (with cache)..."
-    docker-compose up -d --build
+    echo "📦 Building Docker image (with cache)..."
+    docker build -t cv-processor-backend .
 else
     # Default: build without cache for fresh builds
-    echo "📦 Building Docker containers (no cache)..."
-    docker-compose build --no-cache
-    echo "🚀 Starting containers..."
-    docker-compose up -d
+    echo "📦 Building Docker image (no cache)..."
+    docker build --no-cache -t cv-processor-backend .
 fi
+
+# Start containers
+echo "🚀 Starting containers..."
+docker-compose up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
