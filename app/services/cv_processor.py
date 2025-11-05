@@ -15,15 +15,32 @@ class CVProcessor:
         """Extract text from file and parse candidate information"""
         content = await file.read()
 
+        # Normalize content type
+        content_type = file.content_type.split(';')[0].strip().lower() if file.content_type else ""
+
         # Extract text based on file type
-        if file.content_type == "application/pdf":
+        if content_type == "application/pdf":
             raw_text = await CVProcessor._extract_from_pdf(content)
             file_type = "pdf"
-        elif file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        elif content_type in [
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
+            "application/docx"
+        ]:
             raw_text = await CVProcessor._extract_from_docx(content)
             file_type = "docx"
+        elif content_type in ["application/octet-stream", "binary/octet-stream"]:
+            # Try to detect from file signature
+            if content[:4] == b'%PDF':
+                raw_text = await CVProcessor._extract_from_pdf(content)
+                file_type = "pdf"
+            elif content[:2] == b'PK':  # ZIP archive (DOCX is a ZIP file)
+                raw_text = await CVProcessor._extract_from_docx(content)
+                file_type = "docx"
+            else:
+                raise HTTPException(status_code=400, detail="Cannot determine file type from binary content")
         else:
-            raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
+            raise HTTPException(status_code=400, detail=f"Unsupported content type: {content_type}. Only PDF and DOCX files are supported")
 
         if not raw_text:
             raise HTTPException(status_code=400, detail="Could not extract text from file")

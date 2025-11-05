@@ -17,6 +17,9 @@ services:
       retries: 5
 
   backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: cv-processor-backend
     container_name: cv_processor_backend
     ports:

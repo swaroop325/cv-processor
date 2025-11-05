@@ -10,6 +10,10 @@ app = FastAPI(
     description="CV Processing Backend with vector similarity matching"
 )
 
+# Include routers
+app.include_router(cv.router, prefix="/api/cv", tags=["CV"])
+app.include_router(jd.router, prefix="/api/jd", tags=["JD"])
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -18,10 +22,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Include routers
-app.include_router(cv.router, prefix="/api/cv", tags=["CV"])
-app.include_router(jd.router, prefix="/api/jd", tags=["JD"])
 
 
 @app.get("/health", dependencies=[Depends(verify_secret_key)])
