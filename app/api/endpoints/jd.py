@@ -106,12 +106,18 @@ async def find_best_cvs(
     Accepts JSON with job_title and optional top_k (default: 5)
     Requires: X-Secret-Key header
     """
-    # Get JD by title
-    result = await db.execute(select(JD).where(JD.title == request.job_title))
+    # Get JD by title (most recent active one)
+    result = await db.execute(
+        select(JD)
+        .where(JD.title == request.job_title)
+        .where(JD.is_active == True)
+        .order_by(JD.created_at.desc())
+        .limit(1)
+    )
     jd = result.scalar_one_or_none()
 
     if not jd:
-        raise HTTPException(status_code=404, detail=f"Job description with title '{request.job_title}' not found")
+        raise HTTPException(status_code=404, detail=f"Active job description with title '{request.job_title}' not found")
 
     if not jd.embedding_generated or jd.embedding is None or len(jd.embedding) == 0:
         raise HTTPException(status_code=400, detail="JD embedding not available")
@@ -169,17 +175,28 @@ async def contact_candidate(
     Accepts JSON with candidate_name and job_title
     Requires: X-Secret-Key header
     """
-    # Get CV by candidate name
-    cv_result = await db.execute(select(CV).where(CV.candidate_name == request.candidate_name))
+    # Get CV by candidate name (most recent one)
+    cv_result = await db.execute(
+        select(CV)
+        .where(CV.candidate_name == request.candidate_name)
+        .order_by(CV.created_at.desc())
+        .limit(1)
+    )
     cv = cv_result.scalar_one_or_none()
     if not cv:
         raise HTTPException(status_code=404, detail=f"Candidate '{request.candidate_name}' not found")
 
-    # Get JD by job title
-    jd_result = await db.execute(select(JD).where(JD.title == request.job_title))
+    # Get JD by job title (most recent active one)
+    jd_result = await db.execute(
+        select(JD)
+        .where(JD.title == request.job_title)
+        .where(JD.is_active == True)
+        .order_by(JD.created_at.desc())
+        .limit(1)
+    )
     jd = jd_result.scalar_one_or_none()
     if not jd:
-        raise HTTPException(status_code=404, detail=f"Job '{request.job_title}' not found")
+        raise HTTPException(status_code=404, detail=f"Active job '{request.job_title}' not found")
 
     # Create acceptance email
     company = jd.company or "Our Company"
